@@ -1,3 +1,5 @@
+require "thread"
+
 module Jekyll
   module Commands
     class Serve < Command
@@ -12,8 +14,21 @@ module Jekyll
           "show_dir_listing"   => ["--show-dir-listing",
             "Show a directory listing instead of loading your index file."],
           "skip_initial_build" => ["skip_initial_build", "--skip-initial-build",
-            "Skips the initial site build which occurs before the server is started."]
+            "Skips the initial site build which occurs before the server is started."],
+          "livereload"         => ["-l", "--livereload",
+            "Use LiveReload to automatically refresh browsers"],
+          "swf"                => ["--swf", "Use Flash for WebSockets support"],
+          "ignore"             => ["--ignore GLOB1[,GLOB2[,GLOB3...]]", Array,
+            "Files for LiveReload to ignore. Remember to quote the values so your shell "\
+            "won't expand them"],
+          "min_delay"          => ["--min-delay [SECONDS]", "Minimum reload delay"],
+          "max_delay"          => ["--max-delay [SECONDS]", "Maximum reload delay"],
+          "reload_port"        => ["--reload-port [PORT]", Integer,
+            "Port for LiveReload to listen on"]
         }.freeze
+
+        LIVERELOAD_PORT = 35_729
+        LIVERELOAD_DIR = File.join(File.dirname(__FILE__), "serve", "livereload_assets")
 
         #
 
@@ -32,26 +47,117 @@ module Jekyll
             cmd.action do |_, opts|
               opts["serving"] = true
               opts["watch"  ] = true unless opts.key?("watch")
-              config = opts["config"]
-              Build.process(opts)
-              opts["config"] = config
-              Serve.process(opts)
+              opts["reload_port"] = LIVERELOAD_PORT unless opts.key?("reload_port")
+
+              validate_options(opts)
+              start(opts)
             end
           end
         end
 
         #
 
+        def start(opts)
+          config = opts["config"]
+          @reload_reactor = nil
+          register_reload_hooks(opts) if opts["livereload"]
+          Build.process(opts)
+          opts["config"] = config
+          Serve.process(opts)
+        end
+
+        #
+
+        # rubocop:disable Metrics/AbcSize
         def process(opts)
           opts = configuration_from_options(opts)
           destination = opts["destination"]
           setup(destination)
 
-          server = WEBrick::HTTPServer.new(webrick_opts(opts)).tap { |o| o.unmount("") }
-          server.mount(opts["baseurl"], Servlet, destination, file_handler_opts)
-          Jekyll.logger.info "Server address:", server_address(server, opts)
-          launch_browser server, opts if opts["open_url"]
-          boot_or_detach server, opts
+          # Need some way of communicating between the stop and start callbacks
+          @running = Queue.new
+
+          if opts["livereload"]
+            @reload_reactor.start(opts)
+          end
+
+          @server = WEBrick::HTTPServer.new(webrick_opts(opts)).tap { |o| o.unmount("") }
+
+          @server.mount("#{opts["baseurl"]}/__livereload",
+            WEBrick::HTTPServlet::FileHandler, LIVERELOAD_DIR)
+          @server.mount(opts["baseurl"], Servlet, destination, file_handler_opts)
+
+          Jekyll.logger.info "Server address:", server_address(@server, opts)
+          launch_browser @server, opts if opts["open_url"]
+          boot_or_detach @server, opts
+        end
+
+        #
+
+        def running?
+          !(@running.nil? || @running.empty?)
+        end
+
+        #
+
+        def shutdown
+          @server.shutdown if running?
+        end
+
+        private
+        # rubocop:disable Metrics/CyclomaticComplexity
+        # rubocop:disable Metrics/PerceivedComplexity
+        def validate_options(opts)
+          if opts["livereload"]
+            if opts["detach"]
+              Jekyll.logger.abort_with "Error:",
+                "--detach and --livereload are mutually exclusive"
+            end
+            unless opts["watch"]
+              Jekyll.logger.warn "Using --livereload without --watch defeats the purpose"\
+                " of LiveReload."
+            end
+          elsif opts["min_delay"] ||
+              opts["max_delay"]   ||
+              opts["ignore"]      ||
+              opts["swf"]         ||
+              opts["reload_port"]
+            Jekyll.logger.warn "The --min-delay, --max-delay, --ignore, --swf, and "\
+              "--reload-port options are only used when LiveReload is enabled."
+
+          end
+        end
+
+        private
+        def register_reload_hooks(opts)
+          require_relative "serve/websockets"
+          @reload_reactor = LiveReloadReactor.new
+
+          Jekyll::Hooks.register(:site, :post_render) do |site|
+            regenerator = Jekyll::Regenerator.new(site)
+            @changed_pages = site.pages.select do |p|
+              regenerator.regenerate?(p)
+            end
+          end
+
+          # A note on ignoring files: LiveReload errs on the side of reloading when it
+          # comes to the message it gets.  If, for example, a page is ignored but a CSS
+          # file linked in the page isn't, the page will still be reloaded if the CSS
+          # file is contained in the message sent to LiveReload.  Additionally, the
+          # path matching is very loose so that a message to reload "/" will always
+          # lead the page to reload since every page starts with "/".
+          Jekyll::Hooks.register(:site, :post_write) do
+            unless @changed_pages.nil? || !@reload_reactor.running?
+              ignore, @changed_pages = @changed_pages.partition do |p|
+                opts["ignore"].any? do |filter|
+                  File.fnmatch(filter, Jekyll.sanitized_path(p.relative_path))
+                end
+              end
+              Jekyll.logger.debug "LiveReload:", "Ignoring #{ignore.map(&:relative_path)}"
+              @reload_reactor.reload(@changed_pages)
+            end
+            @changed_pages = nil
+          end
         end
 
         # Do a base pre-setup of WEBRick so that everything is in place
@@ -76,6 +182,7 @@ module Jekyll
         #
 
         private
+        # rubocop:disable Metrics/MethodLength
         def webrick_opts(opts)
           opts = {
             :JekyllOptions      => opts,
@@ -83,6 +190,7 @@ module Jekyll
             :MimeTypes          => mime_types,
             :DocumentRoot       => opts["destination"],
             :StartCallback      => start_callback(opts["detach"]),
+            :StopCallback       => stop_callback(opts["detach"]),
             :BindAddress        => opts["host"],
             :Port               => opts["port"],
             :DirectoryIndex     => %W(
@@ -172,19 +280,29 @@ module Jekyll
         # forget to add one of the certificates.
 
         private
-        # rubocop:disable Metrics/AbcSize
         def enable_ssl(opts)
-          return if !opts[:JekyllOptions]["ssl_cert"] && !opts[:JekyllOptions]["ssl_key"]
-          if !opts[:JekyllOptions]["ssl_cert"] || !opts[:JekyllOptions]["ssl_key"]
+          jekyll_opts = opts[:JekyllOptions]
+          return if !jekyll_opts["ssl_cert"] && !jekyll_opts["ssl_key"]
+          if !jekyll_opts["ssl_cert"] || !jekyll_opts["ssl_key"]
             # rubocop:disable Style/RedundantException
             raise RuntimeError, "--ssl-cert or --ssl-key missing."
           end
+
+          Jekyll.logger.info "LiveReload:", "Serving over SSL/TLS.  If you are using a "\
+            "certificate signed by an unknown CA, you will need to add an exception "\
+            "for both #{jekyll_opts["host"]}:#{jekyll_opts["port"]} and "\
+            "#{jekyll_opts["host"]}:#{jekyll_opts["reload_port"]}"
+
           require "openssl"
           require "webrick/https"
-          source_key = Jekyll.sanitized_path(opts[:JekyllOptions]["source"], \
-                    opts[:JekyllOptions]["ssl_key" ])
-          source_certificate = Jekyll.sanitized_path(opts[:JekyllOptions]["source"], \
-                    opts[:JekyllOptions]["ssl_cert"])
+          source_key = Jekyll.sanitized_path(
+            jekyll_opts["source"],
+            jekyll_opts["ssl_key"]
+          )
+          source_certificate = Jekyll.sanitized_path(
+            jekyll_opts["source"],
+            jekyll_opts["ssl_cert"]
+          )
           opts[:SSLCertificate] =
             OpenSSL::X509::Certificate.new(File.read(source_certificate))
           opts[:SSLPrivateKey ] = OpenSSL::PKey::RSA.new(File.read(source_key))
@@ -192,11 +310,21 @@ module Jekyll
         end
 
         private
-
         def start_callback(detached)
           unless detached
             proc do
-              Jekyll.logger.info("Server running...", "press ctrl-c to stop.")
+              @running << "."
+              Jekyll.logger.info "Server running...", "press ctrl-c to stop."
+            end
+          end
+        end
+
+        private
+        def stop_callback(detached)
+          unless detached
+            proc do
+              @reload_reactor.stop unless @reload_reactor.nil?
+              @running.clear
             end
           end
         end
