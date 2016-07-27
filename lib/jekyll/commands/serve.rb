@@ -5,24 +5,28 @@ module Jekyll
     class Serve < Command
       class << self
         COMMAND_OPTIONS = {
-          "ssl_cert"           => ["--ssl-cert [CERT]", "X.509 (SSL) certificate."],
-          "host"               => ["host", "-H", "--host [HOST]", "Host to bind to"],
-          "open_url"           => ["-o", "--open-url", "Launch your site in a browser"],
-          "detach"             => ["-B", "--detach", "Run the server in the background"],
-          "ssl_key"            => ["--ssl-key [KEY]", "X.509 (SSL) Private Key."],
-          "port"               => ["-P", "--port [PORT]", "Port to listen on"],
-          "show_dir_listing"   => ["--show-dir-listing",
+          "ssl_cert"             => ["--ssl-cert [CERT]", "X.509 (SSL) certificate."],
+          "host"                 => ["host", "-H", "--host [HOST]", "Host to bind to"],
+          "open_url"             => ["-o", "--open-url", "Launch your site in a browser"],
+          "detach"               => ["-B", "--detach",
+            "Run the server in the background"],
+          "ssl_key"              => ["--ssl-key [KEY]", "X.509 (SSL) Private Key."],
+          "port"                 => ["-P", "--port [PORT]", "Port to listen on"],
+          "show_dir_listing"     => ["--show-dir-listing",
             "Show a directory listing instead of loading your index file."],
-          "skip_initial_build" => ["skip_initial_build", "--skip-initial-build",
+          "skip_initial_build"   => ["skip_initial_build", "--skip-initial-build",
             "Skips the initial site build which occurs before the server is started."],
-          "livereload"         => ["-l", "--livereload",
+          "livereload"           => ["-l", "--livereload",
             "Use LiveReload to automatically refresh browsers"],
-          "ignore"             => ["--ignore GLOB1[,GLOB2[,GLOB3...]]", Array,
+          "livereload_ignore"    => ["--livereload-ignore ignore GLOB1[,GLOB2[,...]]",
+            Array,
             "Files for LiveReload to ignore. Remember to quote the values so your shell "\
             "won't expand them"],
-          "min_delay"          => ["--min-delay [SECONDS]", "Minimum reload delay"],
-          "max_delay"          => ["--max-delay [SECONDS]", "Maximum reload delay"],
-          "reload_port"        => ["--reload-port [PORT]", Integer,
+          "livereload_min_delay" => ["--livereload-min-delay [SECONDS]",
+            "Minimum reload delay"],
+          "livereload_max_delay" => ["--livereload-max-delay [SECONDS]",
+            "Maximum reload delay"],
+          "livereload_port"      => ["--livereload-port [PORT]", Integer,
             "Port for LiveReload to listen on"]
         }.freeze
 
@@ -46,7 +50,7 @@ module Jekyll
             cmd.action do |_, opts|
               opts["serving"] = true
               opts["watch"  ] = true unless opts.key?("watch")
-              opts["reload_port"] = LIVERELOAD_PORT unless opts.key?("reload_port")
+              opts["livereload_port"] = LIVERELOAD_PORT unless opts.key?("livereload_port")
 
               validate_options(opts)
               start(opts)
@@ -115,12 +119,13 @@ module Jekyll
               Jekyll.logger.warn "Using --livereload without --watch defeats the purpose"\
                 " of LiveReload."
             end
-          elsif opts["min_delay"] ||
-              opts["max_delay"]   ||
-              opts["ignore"]      ||
-              opts["reload_port"]
-            Jekyll.logger.warn "The --min-delay, --max-delay, --ignore, and "\
-              "--reload-port options are only used when LiveReload is enabled."
+          elsif opts["livereload_min_delay"] ||
+              opts["liverealod_max_delay"]   ||
+              opts["livereload_ignore"]      ||
+              opts["livereload_port"]
+            Jekyll.logger.warn "The --livereload-min-delay, --livereload-max-delay, "\
+               "--livereoload-ignore, and --livereload-port options require the "\
+               "--livereload option."
 
           end
         end
@@ -146,7 +151,7 @@ module Jekyll
           Jekyll::Hooks.register(:site, :post_write) do
             unless @changed_pages.nil? || !@reload_reactor.running?
               ignore, @changed_pages = @changed_pages.partition do |p|
-                opts["ignore"].any? do |filter|
+                opts["livereload_ignore"].any? do |filter|
                   File.fnmatch(filter, Jekyll.sanitized_path(p.relative_path))
                 end
               end
@@ -288,7 +293,7 @@ module Jekyll
           Jekyll.logger.info "LiveReload:", "Serving over SSL/TLS.  If you are using a "\
             "certificate signed by an unknown CA, you will need to add an exception "\
             "for both #{jekyll_opts["host"]}:#{jekyll_opts["port"]} and "\
-            "#{jekyll_opts["host"]}:#{jekyll_opts["reload_port"]}"
+            "#{jekyll_opts["host"]}:#{jekyll_opts["livereload_port"]}"
 
           require "openssl"
           require "webrick/https"

@@ -89,7 +89,7 @@ module Jekyll
         def template
           template = <<-TEMPLATE
           <script type="text/javascript">
-            JEKYLL_LIVERELOAD_PORT = <%= @options["reload_port"] %>;
+            JEKYLL_LIVERELOAD_PORT = <%= @options["livereload_port"] %>;
             JEKYLL_LIVERELOAD_PROTOCOL = <%= livereload_protocol %>;
           </script>
           <script type="text/javascript" src="<%= livereload_source %>"></script>
@@ -109,14 +109,20 @@ module Jekyll
           # Unclear what "snipver" does. Doc at
           # https://github.com/livereload/livereload-js state that the recommended
           # setting is 1.
-          src = "#{protocol}://#{host_to_use}:#{@options["reload_port"]}"\
+          src = "#{protocol}://#{host_to_use}:#{@options["livereload_port"]}"\
             "/livereload.js?snipver=1"
 
           # XHTML standard requires ampersands to be encoded as entities when in
           # attributes. See http://stackoverflow.com/a/2190292
-          src << "&amp;mindelay=#{@options["min_delay"]}" if @options["min_delay"]
-          src << "&amp;maxdelay=#{@options["max_delay"]}" if @options["max_delay"]
-          src << "&amp;port=#{@options["reload_port"]}" if @options["reload_port"]
+          if @options["livereload_min_delay"]
+            src << "&amp;mindelay=#{@options["livereload_min_delay"]}"
+          end
+          if @options["livereload_max_delay"]
+            src << "&amp;maxdelay=#{@options["livereload_max_delay"]}"
+          end
+          if @options["livereload_port"]
+            src << "&amp;port=#{@options["livereload_port"]}"
+          end
           src
         end
       end
