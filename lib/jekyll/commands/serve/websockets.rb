@@ -97,7 +97,7 @@ module Jekyll
 
               EM.start_server(
                 opts["host"],
-                opts["reload_port"],
+                opts["livereload_port"],
                 HttpAwareConnection,
                 opts
               ) do |ws|
@@ -119,7 +119,7 @@ module Jekyll
                 end
               end
               Jekyll.logger.info(
-                "LiveReload address:", "#{opts["host"]}:#{opts["reload_port"]}"
+                "LiveReload address:", "#{opts["host"]}:#{opts["livereload_port"]}"
               )
             end
           end

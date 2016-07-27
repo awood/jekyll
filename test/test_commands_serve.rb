@@ -37,14 +37,14 @@ class TestCommandsServe < JekyllUnitTest
       Dir.mkdir(@destination) || flunk("Could not make directory #{@destination}")
       @client = HTTPClient.new
       @standard_options = {
-        "port"        => 4000,
-        "host"        => "localhost",
-        "baseurl"     => "",
-        "detach"      => false,
-        "livereload"  => true,
-        "source"      => @temp_dir,
-        "destination" => @destination,
-        "reload_port" => Jekyll::Commands::Serve.singleton_class::LIVERELOAD_PORT
+        "port"            => 4000,
+        "host"            => "localhost",
+        "baseurl"         => "",
+        "detach"          => false,
+        "livereload"      => true,
+        "source"          => @temp_dir,
+        "destination"     => @destination,
+        "livereload_port" => Jekyll::Commands::Serve.singleton_class::LIVERELOAD_PORT
       }
 
       site = instance_double(Jekyll::Site)
@@ -79,7 +79,7 @@ class TestCommandsServe < JekyllUnitTest
     should "serve livereload.js over HTTP on the default LiveReload port" do
       opts = serve(@standard_options)
       content = @client.get_content(
-        "http://#{opts["host"]}:#{opts["reload_port"]}/livereload.js"
+        "http://#{opts["host"]}:#{opts["livereload_port"]}/livereload.js"
       )
       assert_match(%r!LiveReload.on!, content)
     end
@@ -97,7 +97,7 @@ class TestCommandsServe < JekyllUnitTest
 
       @client.ssl_config.add_trust_ca(cert)
       content = @client.get_content(
-        "https://#{opts["host"]}:#{opts["reload_port"]}/livereload.js"
+        "https://#{opts["host"]}:#{opts["livereload_port"]}/livereload.js"
       )
       assert_match(%r!LiveReload.on!, content)
     end
@@ -122,7 +122,7 @@ class TestCommandsServe < JekyllUnitTest
 
     should "serve nothing else over HTTP on the default LiveReload port" do
       opts = serve(@standard_options)
-      res = @client.get("http://#{opts["host"]}:#{opts["reload_port"]}/")
+      res = @client.get("http://#{opts["host"]}:#{opts["livereload_port"]}/")
       assert_equal(400, res.status_code)
       assert_match(%r!only serves livereload.js!, res.content)
     end
@@ -132,14 +132,17 @@ class TestCommandsServe < JekyllUnitTest
       content = @client.get_content(
         "http://#{opts["host"]}:#{opts["port"]}/#{opts["baseurl"]}/hello.html"
       )
-      assert_match(%r!JEKYLL_LIVERELOAD_PORT = #{opts["reload_port"]}!, content)
+      assert_match(%r!JEKYLL_LIVERELOAD_PORT = #{opts["livereload_port"]}!, content)
       assert_match(%r!JEKYLL_LIVERELOAD_PROTOCOL = "ws://"!, content)
       assert_match(%r!livereload.js\?snipver=1!, content)
       assert_match(%r!I am a simple web page!, content)
     end
 
     should "apply the max and min delay options" do
-      opts = serve(@standard_options.merge("max_delay" => "1066", "min_delay" => "3"))
+      opts = serve(@standard_options.merge(
+        "livereload_max_delay" => "1066",
+        "livereload_min_delay" => "3"
+      ))
       content = @client.get_content(
         "http://#{opts["host"]}:#{opts["port"]}/#{opts["baseurl"]}/hello.html"
       )
@@ -215,10 +218,10 @@ class TestCommandsServe < JekyllUnitTest
 
       should "keep config between build and serve" do
         custom_options = {
-          "config"      => %w(_config.yml _development.yml),
-          "serving"     => true,
-          "reload_port" => Jekyll::Commands::Serve.singleton_class::LIVERELOAD_PORT,
-          "watch"       => false # for not having guard output when running the tests
+          "config"          => %w(_config.yml _development.yml),
+          "serving"         => true,
+          "livereload_port" => Jekyll::Commands::Serve.singleton_class::LIVERELOAD_PORT,
+          "watch"           => false # for not having guard output when running the tests
         }
         allow(SafeYAML).to receive(:load_file).and_return({})
         allow(Jekyll::Commands::Build).to receive(:build).and_return("")
