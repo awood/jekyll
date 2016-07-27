@@ -17,7 +17,6 @@ module Jekyll
             "Skips the initial site build which occurs before the server is started."],
           "livereload"         => ["-l", "--livereload",
             "Use LiveReload to automatically refresh browsers"],
-          "swf"                => ["--swf", "Use Flash for WebSockets support"],
           "ignore"             => ["--ignore GLOB1[,GLOB2[,GLOB3...]]", Array,
             "Files for LiveReload to ignore. Remember to quote the values so your shell "\
             "won't expand them"],
@@ -105,7 +104,6 @@ module Jekyll
         end
 
         private
-        # rubocop:disable Metrics/CyclomaticComplexity
         # rubocop:disable Metrics/PerceivedComplexity
         def validate_options(opts)
           if opts["livereload"]
@@ -120,9 +118,8 @@ module Jekyll
           elsif opts["min_delay"] ||
               opts["max_delay"]   ||
               opts["ignore"]      ||
-              opts["swf"]         ||
               opts["reload_port"]
-            Jekyll.logger.warn "The --min-delay, --max-delay, --ignore, --swf, and "\
+            Jekyll.logger.warn "The --min-delay, --max-delay, --ignore, and "\
               "--reload-port options are only used when LiveReload is enabled."
 
           end

@@ -146,26 +146,6 @@ class TestCommandsServe < JekyllUnitTest
       assert_match(%r!&amp;mindelay=3!, content)
       assert_match(%r!&amp;maxdelay=1066!, content)
     end
-
-    should "insert a SWF LiveReload when --swf is used" do
-      opts = serve(@standard_options.merge("swf" => true))
-      host = opts["host"]
-      port = opts["port"]
-      base = opts["baseurl"]
-      content = @client.get_content(
-        "http://#{host}:#{port}/#{base}/hello.html"
-      )
-      assert_match(
-        %r!WEB_SOCKET_SWF_LOCATION = \"/__livereload/WebSocketMain.swf"!,
-        content
-      )
-      assert_match(%r!__livereload/swfobject.js!, content)
-      assert_match(%r!__livereload/web_socket.js!, content)
-      res = @client.get(
-        "http://#{host}:#{port}/#{base}/__livereload/WebSocketMain.swf"
-      )
-      assert_equal(200, res.status_code)
-    end
   end
 
   context "with a program" do
