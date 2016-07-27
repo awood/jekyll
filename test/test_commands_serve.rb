@@ -2,12 +2,170 @@ require "webrick"
 require "mercenary"
 require "helper"
 require "openssl"
+require "httpclient"
+require "tmpdir"
+require "thread"
 
 class TestCommandsServe < JekyllUnitTest
   def custom_opts(what)
     @cmd.send(
       :webrick_opts, what
     )
+  end
+
+  def start_server(opts)
+    @thread = Thread.new do
+      Jekyll::Commands::Serve.start(opts)
+    end
+
+    sleep(0.1) until Jekyll::Commands::Serve.running?
+  end
+
+  def serve(opts)
+    allow(Jekyll).to receive(:configuration).and_return(opts)
+    allow(Jekyll::Commands::Build).to receive(:process)
+
+    start_server(opts)
+
+    opts
+  end
+
+  context "using LiveReload" do
+    setup do
+      @temp_dir = Dir.mktmpdir("jekyll_livereload_test")
+      @destination = File.join(@temp_dir, "_site")
+      Dir.mkdir(@destination) || flunk("Could not make directory #{@destination}")
+      @client = HTTPClient.new
+      @standard_options = {
+        "port"        => 4000,
+        "host"        => "localhost",
+        "baseurl"     => "",
+        "detach"      => false,
+        "livereload"  => true,
+        "source"      => @temp_dir,
+        "destination" => @destination,
+        "reload_port" => Jekyll::Commands::Serve.singleton_class::LIVERELOAD_PORT
+      }
+
+      site = instance_double(Jekyll::Site)
+      simple_page = <<-HTML.gsub(%r!^\s*!, "")
+      <!DOCTYPE HTML>
+      <html lang="en-US">
+      <head>
+        <meta charset="UTF-8">
+        <title>Hello World</title>
+      </head>
+      <body>
+        <p>Hello!  I am a simple web page.</p>
+      </body>
+      </html>
+      HTML
+
+      File.open(File.join(@destination, "hello.html"), "w") do |f|
+        f.write(simple_page)
+      end
+      allow(Jekyll::Site).to receive(:new).and_return(site)
+    end
+
+    teardown do
+      capture_io do
+        Jekyll::Commands::Serve.shutdown
+      end
+      sleep(0.1) while Jekyll::Commands::Serve.running?
+
+      FileUtils.remove_entry_secure(@temp_dir, true)
+    end
+
+    should "serve livereload.js over HTTP on the default LiveReload port" do
+      opts = serve(@standard_options)
+      content = @client.get_content(
+        "http://#{opts["host"]}:#{opts["reload_port"]}/livereload.js"
+      )
+      assert_match(%r!LiveReload.on!, content)
+    end
+
+    should "serve livereload.js over HTTPS" do
+      key = File.join(File.dirname(__FILE__), "fixtures", "test.key")
+      cert = File.join(File.dirname(__FILE__), "fixtures", "test.crt")
+
+      FileUtils.cp(key, @temp_dir)
+      FileUtils.cp(cert, @temp_dir)
+      opts = serve(@standard_options.merge(
+        "ssl_cert" => "test.crt",
+        "ssl_key"  => "test.key"
+      ))
+
+      @client.ssl_config.add_trust_ca(cert)
+      content = @client.get_content(
+        "https://#{opts["host"]}:#{opts["reload_port"]}/livereload.js"
+      )
+      assert_match(%r!LiveReload.on!, content)
+    end
+
+    should "use wss when SSL options are provided" do
+      key = File.join(File.dirname(__FILE__), "fixtures", "test.key")
+      cert = File.join(File.dirname(__FILE__), "fixtures", "test.crt")
+
+      FileUtils.cp(key, @temp_dir)
+      FileUtils.cp(cert, @temp_dir)
+      opts = serve(@standard_options.merge(
+        "ssl_cert" => "test.crt",
+        "ssl_key"  => "test.key"
+      ))
+
+      @client.ssl_config.add_trust_ca(cert)
+      content = @client.get_content(
+        "https://#{opts["host"]}:#{opts["port"]}/#{opts["baseurl"]}/hello.html"
+      )
+      assert_match(%r!JEKYLL_LIVERELOAD_PROTOCOL = "wss://";!, content)
+    end
+
+    should "serve nothing else over HTTP on the default LiveReload port" do
+      opts = serve(@standard_options)
+      res = @client.get("http://#{opts["host"]}:#{opts["reload_port"]}/")
+      assert_equal(400, res.status_code)
+      assert_match(%r!only serves livereload.js!, res.content)
+    end
+
+    should "insert the LiveReload script tags" do
+      opts = serve(@standard_options)
+      content = @client.get_content(
+        "http://#{opts["host"]}:#{opts["port"]}/#{opts["baseurl"]}/hello.html"
+      )
+      assert_match(%r!JEKYLL_LIVERELOAD_PORT = #{opts["reload_port"]}!, content)
+      assert_match(%r!JEKYLL_LIVERELOAD_PROTOCOL = "ws://"!, content)
+      assert_match(%r!livereload.js\?snipver=1!, content)
+      assert_match(%r!I am a simple web page!, content)
+    end
+
+    should "apply the max and min delay options" do
+      opts = serve(@standard_options.merge("max_delay" => "1066", "min_delay" => "3"))
+      content = @client.get_content(
+        "http://#{opts["host"]}:#{opts["port"]}/#{opts["baseurl"]}/hello.html"
+      )
+      assert_match(%r!&amp;mindelay=3!, content)
+      assert_match(%r!&amp;maxdelay=1066!, content)
+    end
+
+    should "insert a SWF LiveReload when --swf is used" do
+      opts = serve(@standard_options.merge("swf" => true))
+      host = opts["host"]
+      port = opts["port"]
+      base = opts["baseurl"]
+      content = @client.get_content(
+        "http://#{host}:#{port}/#{base}/hello.html"
+      )
+      assert_match(
+        %r!WEB_SOCKET_SWF_LOCATION = \"/__livereload/WebSocketMain.swf"!,
+        content
+      )
+      assert_match(%r!__livereload/swfobject.js!, content)
+      assert_match(%r!__livereload/web_socket.js!, content)
+      res = @client.get(
+        "http://#{host}:#{port}/#{base}/__livereload/WebSocketMain.swf"
+      )
+      assert_equal(200, res.status_code)
+    end
   end
 
   context "with a program" do
@@ -77,9 +235,10 @@ class TestCommandsServe < JekyllUnitTest
 
       should "keep config between build and serve" do
         custom_options = {
-          "config"  => %w(_config.yml _development.yml),
-          "serving" => true,
-          "watch"   => false # for not having guard output when running the tests
+          "config"      => %w(_config.yml _development.yml),
+          "serving"     => true,
+          "reload_port" => Jekyll::Commands::Serve.singleton_class::LIVERELOAD_PORT,
+          "watch"       => false # for not having guard output when running the tests
         }
         allow(SafeYAML).to receive(:load_file).and_return({})
         allow(Jekyll::Commands::Build).to receive(:build).and_return("")
