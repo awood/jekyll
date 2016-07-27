@@ -51,10 +51,6 @@ module Jekyll
           @processed = false
         end
 
-        def with_swf?
-          @options["swf"]
-        end
-
         def processed?
           @processed
         end
@@ -92,14 +88,6 @@ module Jekyll
 
         def template
           template = <<-TEMPLATE
-          <% if with_swf? %>
-            <script type="text/javascript">
-              WEB_SOCKET_SWF_LOCATION = "<%= @options["baseurl"] %>/__livereload/WebSocketMain.swf";
-              WEB_SOCKET_FORCE_FLASH = false;
-            </script>
-            <script type="text/javascript" src="<%= @options["baseurl"] %>/__livereload/swfobject.js"></script>
-            <script type="text/javascript" src="<%= @options["baseurl"] %>/__livereload/web_socket.js"></script>
-          <% end %>
           <script type="text/javascript">
             JEKYLL_LIVERELOAD_PORT = <%= @options["reload_port"] %>;
             JEKYLL_LIVERELOAD_PROTOCOL = <%= livereload_protocol %>;
