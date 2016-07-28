@@ -50,7 +50,7 @@ module Jekyll
             cmd.action do |_, opts|
               opts["serving"] = true
               opts["watch"  ] = true unless opts.key?("watch")
-              opts["livereload_port"] = LIVERELOAD_PORT unless opts.key?("livereload_port")
+              opts["livereload_port"] ||= LIVERELOAD_PORT
 
               validate_options(opts)
               start(opts)
@@ -151,7 +151,7 @@ module Jekyll
           Jekyll::Hooks.register(:site, :post_write) do
             unless @changed_pages.nil? || !@reload_reactor.running?
               ignore, @changed_pages = @changed_pages.partition do |p|
-                opts["livereload_ignore"].any? do |filter|
+                Array(opts["livereload_ignore"]).any? do |filter|
                   File.fnmatch(filter, Jekyll.sanitized_path(p.relative_path))
                 end
               end

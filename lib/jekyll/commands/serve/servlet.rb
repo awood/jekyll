@@ -55,13 +55,18 @@ module Jekyll
           @processed
         end
 
+        # rubocop:disable Metrics/MethodLength
         def process!
           @new_body = []
-          begin
-            @body.each { |line| @new_body << line.to_s }
-          ensure
-            # @body will be a File object
-            @body.close
+          # @body will usually be a File object but Strings occur in rare cases
+          if @body.respond_to?(:each)
+            begin
+              @body.each { |line| @new_body << line.to_s }
+            ensure
+              @body.close
+            end
+          else
+            @new_body = @body.lines
           end
 
           @content_length = 0
@@ -88,18 +93,11 @@ module Jekyll
 
         def template
           template = <<-TEMPLATE
-          <script type="text/javascript">
-            JEKYLL_LIVERELOAD_PORT = <%= @options["livereload_port"] %>;
-            JEKYLL_LIVERELOAD_PROTOCOL = <%= livereload_protocol %>;
+          <script>
+            document.write('<script src="<%= livereload_source %>"></' + 'script>');
           </script>
-          <script type="text/javascript" src="<%= livereload_source %>"></script>
           TEMPLATE
           ERB.new(Jekyll::Utils.strip_heredoc(template))
-        end
-
-        def livereload_protocol
-          use_ssl = @options["ssl_cert"] && @options["ssl_key"]
-          use_ssl ? '"wss://"' : '"ws://"'
         end
 
         def livereload_source

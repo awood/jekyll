@@ -117,7 +117,12 @@ class TestCommandsServe < JekyllUnitTest
       content = @client.get_content(
         "https://#{opts["host"]}:#{opts["port"]}/#{opts["baseurl"]}/hello.html"
       )
-      assert_match(%r!JEKYLL_LIVERELOAD_PROTOCOL = "wss://";!, content)
+      # The livereload JS determines whether to use wss or ws based on whether
+      # it is loaded over http or https.
+      assert_match(
+        %r!src="https://#{opts["host"]}:#{opts["livereload_port"]}/livereload.js!,
+        content
+      )
     end
 
     should "serve nothing else over HTTP on the default LiveReload port" do
@@ -132,9 +137,10 @@ class TestCommandsServe < JekyllUnitTest
       content = @client.get_content(
         "http://#{opts["host"]}:#{opts["port"]}/#{opts["baseurl"]}/hello.html"
       )
-      assert_match(%r!JEKYLL_LIVERELOAD_PORT = #{opts["livereload_port"]}!, content)
-      assert_match(%r!JEKYLL_LIVERELOAD_PROTOCOL = "ws://"!, content)
-      assert_match(%r!livereload.js\?snipver=1!, content)
+      assert_match(
+        %r!livereload.js\?snipver=1&amp;port=#{opts["livereload_port"]}!,
+        content
+      )
       assert_match(%r!I am a simple web page!, content)
     end
 
