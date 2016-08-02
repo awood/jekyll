@@ -9,7 +9,7 @@ module Jekyll
       # despite the fact that the protocol itself uses WebSockets.  This custom connection
       # class addresses the dual protocols that the server needs to understand.
       class HttpAwareConnection < EventMachine::WebSocket::Connection
-        attr_reader :reload_file
+        attr_reader :reload_body, :reload_size
 
         def initialize(opts)
           em_opts = {}
@@ -28,7 +28,10 @@ module Jekyll
 
           super(em_opts)
 
-          @reload_file = File.join(Serve.singleton_class::LIVERELOAD_DIR, "livereload.js")
+          reload_file = File.join(Serve.singleton_class::LIVERELOAD_DIR, "livereload.js")
+
+          @reload_body = File.read(reload_file)
+          @reload_size = File.size(reload_file)
         end
 
         # rubocop:disable Metrics/MethodLength
@@ -44,14 +47,16 @@ module Jekyll
             headers = [
               "HTTP/1.1 200 OK",
               "Content-Type: application/javascript",
-              "Content-Length: #{File.size(reload_file)}",
+              "Content-Length: #{reload_size}",
               "",
               ""
             ].join("\r\n")
             send_data(headers)
-            stream_file_data(reload_file).callback do
-              close_connection_after_writing
-            end
+
+            # stream_file_data would free us from keeping livereload.js in memory
+            # but JRuby blocks on that call and never returns
+            send_data(reload_body)
+            close_connection_after_writing
           else
             body = "This port only serves livereload.js over HTTP.\n"
             headers = [
@@ -78,8 +83,10 @@ module Jekyll
         end
 
         def stop
+          # There is only one EventMachine instance per Ruby process so stopping
+          # it here will stop the reactor thread we have running.
+          EM.stop if EM.reactor_running?
           Jekyll.logger.debug("LiveReload Server:", "halted")
-          @thread.kill unless @thread.nil?
         end
 
         def running?

@@ -36,6 +36,7 @@ class TestCommandsServe < JekyllUnitTest
       @destination = File.join(@temp_dir, "_site")
       Dir.mkdir(@destination) || flunk("Could not make directory #{@destination}")
       @client = HTTPClient.new
+      @client.connect_timeout = 5
       @standard_options = {
         "port"            => 4000,
         "host"            => "localhost",
@@ -85,6 +86,7 @@ class TestCommandsServe < JekyllUnitTest
     end
 
     should "serve livereload.js over HTTPS" do
+      skip("EventMachine TLS support is dodgy in JRuby") if jruby?
       key = File.join(File.dirname(__FILE__), "fixtures", "test.key")
       cert = File.join(File.dirname(__FILE__), "fixtures", "test.crt")
 
