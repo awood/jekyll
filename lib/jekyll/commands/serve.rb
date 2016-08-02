@@ -49,10 +49,14 @@ module Jekyll
 
             cmd.action do |_, opts|
               opts["serving"] = true
-              opts["watch"  ] = true unless opts.key?("watch")
+
+              # Check to make sure the specified options make sense logically
+              # before setting defaults.
+              validate_options(opts)
+
+              opts["watch"] = true unless opts.key?("watch")
               opts["livereload_port"] ||= LIVERELOAD_PORT
 
-              validate_options(opts)
               start(opts)
             end
           end
