@@ -23,7 +23,8 @@ module Jekyll
           end
 
           # This is too noisy even for --verbose, but uncomment if you need it for
-          # a specific WebSockets issue
+          # a specific WebSockets issue.  Adding ?LR-verbose=true onto the URL will
+          # enable logging on the client side.
           # em_opts[:debug] = true
 
           super(em_opts)
@@ -99,7 +100,7 @@ module Jekyll
             EM.epoll
             EM.run do
               EM.error_handler do |e|
-                log_error(e.message)
+                log_error(e)
               end
 
               EM.start_server(
@@ -185,12 +186,13 @@ module Jekyll
         end
 
         private
-        def log_error(message)
+        def log_error(e)
           Jekyll.logger.warn(
             "LiveReload experienced an error. "\
             "Run with --verbose for more information."
           )
-          Jekyll.logger.debug("LiveReload Error:", message)
+          Jekyll.logger.debug("LiveReload Error:", e.message)
+          Jekyll.logger.debug("LiveReload Error:", e.backtrace.join("\n"))
         end
       end
     end
