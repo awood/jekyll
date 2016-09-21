@@ -54,8 +54,10 @@ module Jekyll
               # before setting defaults.
               validate_options(opts)
 
+              # watch can legitimately be `false` so don't switch to ||=
               opts["watch"] = true unless opts.key?("watch")
-              opts["livereload_port"] ||= LIVERELOAD_PORT
+              opts["livereload_port"] = LIVERELOAD_PORT \
+                unless opts.key?("livereload_port")
 
               start(opts)
             end
@@ -121,13 +123,12 @@ module Jekyll
                 " of LiveReload."
             end
           elsif opts["livereload_min_delay"] ||
-              opts["liverealod_max_delay"]   ||
+              opts["livereload_max_delay"]   ||
               opts["livereload_ignore"]      ||
               opts["livereload_port"]
             Jekyll.logger.warn "The --livereload-min-delay, --livereload-max-delay, "\
-               "--livereoload-ignore, and --livereload-port options require the "\
+               "--livereload-ignore, and --livereload-port options require the "\
                "--livereload option."
-
           end
         end
 
@@ -284,28 +285,24 @@ module Jekyll
 
         private
         def enable_ssl(opts)
-          jekyll_opts = opts[:JekyllOptions]
-          return if !jekyll_opts["ssl_cert"] && !jekyll_opts["ssl_key"]
-          if !jekyll_opts["ssl_cert"] || !jekyll_opts["ssl_key"]
+          return if !opts[:JekyllOptions]["ssl_cert"] && !opts[:JekyllOptions]["ssl_key"]
+          if !opts[:JekyllOptions]["ssl_cert"] || !opts[:JekyllOptions]["ssl_key"]
             # rubocop:disable Style/RedundantException
             raise RuntimeError, "--ssl-cert or --ssl-key missing."
           end
+          require "openssl"
+          require "webrick/https"
 
           Jekyll.logger.info "LiveReload:", "Serving over SSL/TLS.  If you are using a "\
             "certificate signed by an unknown CA, you will need to add an exception "\
-            "for both #{jekyll_opts["host"]}:#{jekyll_opts["port"]} and "\
-            "#{jekyll_opts["host"]}:#{jekyll_opts["livereload_port"]}"
+            "for #{opts[:JekyllOptions]["host"]} on ports "\
+            "#{opts[:JekyllOptions]["port"]} and "\
+            "#{opts[:JekyllOptions]["livereload_port"]}"
 
-          require "openssl"
-          require "webrick/https"
-          source_key = Jekyll.sanitized_path(
-            jekyll_opts["source"],
-            jekyll_opts["ssl_key"]
-          )
-          source_certificate = Jekyll.sanitized_path(
-            jekyll_opts["source"],
-            jekyll_opts["ssl_cert"]
-          )
+          source_key = Jekyll.sanitized_path(opts[:JekyllOptions]["source"], \
+                    opts[:JekyllOptions]["ssl_key" ])
+          source_certificate = Jekyll.sanitized_path(opts[:JekyllOptions]["source"], \
+                    opts[:JekyllOptions]["ssl_cert"])
           opts[:SSLCertificate] =
             OpenSSL::X509::Certificate.new(File.read(source_certificate))
           opts[:SSLPrivateKey ] = OpenSSL::PKey::RSA.new(File.read(source_key))
