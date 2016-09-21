@@ -36,7 +36,6 @@ module Jekyll
         end
 
         # rubocop:disable Metrics/MethodLength
-        # rubocop:disable Metrics/AbcSize
         def dispatch(data)
           parser = Http::Parser.new
           parser << data
