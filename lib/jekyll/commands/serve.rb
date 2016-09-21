@@ -1,8 +1,211 @@
 require "thread"
+require "rack"
+require "thin"
+require "json"
+require "em-websocket"
+require "http/parser"
 
 module Jekyll
   module Commands
     class Serve < Command
+      # The LiveReload protocol requires the server to serve livereload.js over HTTP
+      # despite the fact that the protocol itself uses WebSockets.  This custom connection
+      # class addresses the dual protocols that the server needs to understand.
+      class HttpAwareConnection < EventMachine::WebSocket::Connection
+        attr_reader :reload_body, :reload_size
+
+        def initialize(opts)
+          em_opts = {}
+          @ssl_enabled = opts["ssl_cert"] && opts["ssl_key"]
+          if @ssl_enabled
+            em_opts[:tls_options] = {
+              :private_key_file => Jekyll.sanitized_path(opts["source"], opts["ssl_key"]),
+              :cert_chain_file  => Jekyll.sanitized_path(opts["source"], opts["ssl_cert"])
+            }
+            em_opts[:secure] = true
+          end
+
+          # This is too noisy even for --verbose, but uncomment if you need it for
+          # a specific WebSockets issue.  Adding ?LR-verbose=true onto the URL will
+          # enable logging on the client side.
+          # em_opts[:debug] = true
+
+          super(em_opts)
+
+          reload_file = File.join(Serve.singleton_class::LIVERELOAD_DIR, "livereload.js")
+
+          @reload_body = File.read(reload_file)
+          @reload_size = File.size(reload_file)
+        end
+
+        # rubocop:disable Metrics/MethodLength
+        # rubocop:disable Metrics/AbcSize
+        def dispatch(data)
+          parser = Http::Parser.new
+          parser << data
+
+          # WebSockets requests will have a Connection: Upgrade header
+          if parser.http_method != "GET" || parser.upgrade?
+            super
+          elsif parser.request_url =~ %r!^\/livereload.js!
+            headers = [
+              "HTTP/1.1 200 OK",
+              "Content-Type: application/javascript",
+              "Content-Length: #{reload_size}",
+              "",
+              ""
+            ].join("\r\n")
+            send_data(headers)
+
+            # stream_file_data would free us from keeping livereload.js in memory
+            # but JRuby blocks on that call and never returns
+            send_data(reload_body)
+            close_connection_after_writing
+          else
+            body = "This port only serves livereload.js over HTTP.\n"
+            headers = [
+              "HTTP/1.1 400 Bad Request",
+              "Content-Type: text/plain",
+              "Content-Length: #{body.bytesize}",
+              "",
+              ""
+            ].join("\r\n")
+            send_data(headers)
+            send_data(body)
+            close_connection_after_writing
+          end
+        end
+      end
+
+      class LiveReloadBackend < Thin::Backends::TcpServer
+        attr_reader :opts
+
+        def initialize(host, port, opts)
+          super(host, port)
+          @opts = opts
+          @websockets = []
+          @connections_count = 0
+          @reload_channel = @opts[:channel]
+        end
+
+        # def stop
+        #   # There is only one EventMachine instance per Ruby process so stopping
+        #   # it here will stop the reactor thread we have running.
+        #   EM.stop if EM.reactor_running?
+        #   Jekyll.logger.debug("LiveReload Server:", "halted")
+        # end
+
+        # def running?
+        #   !@thread.nil? && @thread.alive?
+        # end
+        #
+
+        def connect
+          super
+
+          @livereload_signature = EM.start_server(
+            @host,
+            opts["livereload_port"],
+            HttpAwareConnection,
+            opts
+          ) do |ws|
+            ws.onopen do |handshake|
+              ws_connect(ws, handshake)
+            end
+
+            ws.onclose do
+              ws_disconnect(ws)
+            end
+
+            ws.onmessage do |msg|
+              print_message(msg)
+            end
+
+            ws.onerror do |error|
+              log_error(error)
+            end
+          end
+
+          Jekyll.logger.info("SUBSCRIBING to #{@reload_channel}")
+          @sid = @reload_channel.subscribe do |msg|
+            Jekyll.logger.info("Got msg #{msg}")
+            reload(msg)
+          end
+
+          Jekyll.logger.info(
+            "LiveReload address:", "#{opts["host"]}:#{opts["livereload_port"]}"
+          )
+        end
+
+        def disconnect
+          @reload_channel.unsubscribe(@sid)
+          EventMachine.stop_server(@livereload_signature)
+        end
+
+        # For a description of the protocol see
+        # http://feedback.livereload.com/knowledgebase/articles/86174-livereload-protocol
+        def reload(pages)
+          pages.each do |p|
+            msg = {
+              :command => "reload",
+              :path    => p.url,
+              :liveCSS => true
+            }
+
+            Jekyll.logger.debug("LiveReload:", "Reloading #{p.url}")
+            Jekyll.logger.debug(JSON.dump(msg))
+            @websockets.each do |ws|
+              ws.send(JSON.dump(msg))
+            end
+          end
+        end
+
+        private
+        def ws_connect(ws, handshake)
+          @connections_count += 1
+          if @connections_count == 1
+            message = "Browser connected"
+            message << " over SSL/TLS" if handshake.secure?
+            Jekyll.logger.info("LiveReload:", message)
+          end
+          ws.send(
+            JSON.dump(
+              :command    => "hello",
+              :protocols  => ["http://livereload.com/protocols/official-7"],
+              :serverName => "jekyll"
+            )
+          )
+
+
+          @websockets << ws
+        end
+
+        private
+        def ws_disconnect(ws)
+          @websockets.delete(ws)
+        end
+
+        private
+        def print_message(json_message)
+          msg = JSON.parse(json_message)
+          # Not sure what the 'url' command even does in LiveReload.  The spec is silent
+          # on its purpose.
+          if msg["command"] == "url"
+            Jekyll.logger.info("LiveReload:", "Browser URL: #{msg["url"]}")
+          end
+        end
+
+        private
+        def log_error(e)
+          Jekyll.logger.warn(
+            "LiveReload experienced an error. "\
+            "Run with --verbose for more information."
+          )
+          Jekyll.logger.debug("LiveReload Error:", e.message)
+          Jekyll.logger.debug("LiveReload Error:", e.backtrace.join("\n"))
+        end
+      end
+
       class << self
         COMMAND_OPTIONS = {
           "ssl_cert"             => ["--ssl-cert [CERT]", "X.509 (SSL) certificate."],
@@ -66,7 +269,7 @@ module Jekyll
 
         def start(opts)
           config = opts["config"]
-          @reload_reactor = nil
+          @reload_channel = nil
           register_reload_hooks(opts) if opts["livereload"]
           Build.process(opts)
           opts["config"] = config
@@ -84,12 +287,23 @@ module Jekyll
           # Need some way of communicating between the stop and start callbacks
           @running = Queue.new
 
-          if opts["livereload"]
-            @reload_reactor.start(opts)
-          end
+          # if opts["livereload"]
+          #   @reload_reactor.start(opts)
+          # end
 
-          @server = WEBrick::HTTPServer.new(webrick_opts(opts)).tap { |o| o.unmount("") }
-          @server.mount(opts["baseurl"], Servlet, destination, file_handler_opts)
+          # @server = WEBrick::HTTPServer.new(webrick_opts(opts)).tap { |o| o.unmount("") }
+          # @server.mount(opts["baseurl"], Servlet, destination, file_handler_opts)
+          puts(opts["destination"])
+          @server = Thin::Server.new(opts["host"], opts["port"], {:backend => LiveReloadBackend, :channel => @reload_channel}.merge(opts)) do
+            use Servlet,
+              :urls => [""],
+              :root => opts["destination"],
+              :index => "index.html",
+              :JekyllOptions => opts
+            run Rack::URLMap.new({
+              "/" => Rack::Directory.new(opts["destination"]),
+            })
+          end
 
           Jekyll.logger.info "Server address:", server_address(@server, opts)
           launch_browser @server, opts if opts["open_url"]
@@ -134,7 +348,7 @@ module Jekyll
         private
         def register_reload_hooks(opts)
           require_relative "serve/websockets"
-          @reload_reactor = LiveReloadReactor.new
+          @reload_channel = EM::Channel.new
 
           Jekyll::Hooks.register(:site, :post_render) do |site|
             regenerator = Jekyll::Regenerator.new(site)
@@ -150,14 +364,15 @@ module Jekyll
           # path matching is very loose so that a message to reload "/" will always
           # lead the page to reload since every page starts with "/".
           Jekyll::Hooks.register(:site, :post_write) do
-            unless @changed_pages.nil? || !@reload_reactor.running?
+            unless @changed_pages.nil?  # || !@server.running?
               ignore, @changed_pages = @changed_pages.partition do |p|
                 Array(opts["livereload_ignore"]).any? do |filter|
                   File.fnmatch(filter, Jekyll.sanitized_path(p.relative_path))
                 end
               end
               Jekyll.logger.debug "LiveReload:", "Ignoring #{ignore.map(&:relative_path)}"
-              @reload_reactor.reload(@changed_pages)
+              Jekyll.logger.debug("Pushing #{@changed_pages}")
+              @reload_channel.push(@changed_pages)
             end
             @changed_pages = nil
           end
@@ -184,33 +399,33 @@ module Jekyll
 
         #
 
-        private
-        # rubocop:disable Metrics/MethodLength
-        def webrick_opts(opts)
-          opts = {
-            :JekyllOptions      => opts,
-            :DoNotReverseLookup => true,
-            :MimeTypes          => mime_types,
-            :DocumentRoot       => opts["destination"],
-            :StartCallback      => start_callback(opts["detach"]),
-            :StopCallback       => stop_callback(opts["detach"]),
-            :BindAddress        => opts["host"],
-            :Port               => opts["port"],
-            :DirectoryIndex     => %W(
-              index.htm
-              index.html
-              index.rhtml
-              index.cgi
-              index.xml
-            )
-          }
+        # private
+        # # rubocop:disable Metrics/MethodLength
+        # def webrick_opts(opts)
+        #   opts = {
+        #     :JekyllOptions      => opts,
+        #     :DoNotReverseLookup => true,
+        #     :MimeTypes          => mime_types,
+        #     :DocumentRoot       => opts["destination"],
+        #     :StartCallback      => start_callback(opts["detach"]),
+        #     :StopCallback       => stop_callback(opts["detach"]),
+        #     :BindAddress        => opts["host"],
+        #     :Port               => opts["port"],
+        #     :DirectoryIndex     => %W(
+        #       index.htm
+        #       index.html
+        #       index.rhtml
+        #       index.cgi
+        #       index.xml
+        #     )
+        #   }
 
-          opts[:DirectoryIndex] = [] if opts[:JekyllOptions]["show_dir_listing"]
+        #   opts[:DirectoryIndex] = [] if opts[:JekyllOptions]["show_dir_listing"]
 
-          enable_ssl(opts)
-          enable_logging(opts)
-          opts
-        end
+        #   enable_ssl(opts)
+        #   enable_logging(opts)
+        #   opts
+        # end
 
         # Recreate NondisclosureName under utf-8 circumstance
 
@@ -229,10 +444,10 @@ module Jekyll
         private
         def server_address(server, opts)
           format("%{prefix}://%{address}:%{port}%{baseurl}", {
-            :prefix  => server.config[:SSLEnable] ? "https" : "http",
+            :prefix  => server.ssl? ? "https" : "http",
             :baseurl => opts["baseurl"] ? "#{opts["baseurl"]}/" : "",
-            :address => server.config[:BindAddress],
-            :port    => server.config[:Port]
+            :address => server.host,
+            :port    => server.port
           })
         end
 
@@ -263,9 +478,10 @@ module Jekyll
             Jekyll.logger.info "Server detached with pid '#{pid}'.", \
               "Run `pkill -f jekyll' or `kill -9 #{pid}' to stop the server."
           else
-            t = Thread.new { server.start }
-            trap("INT") { server.shutdown }
-            t.join
+            server.start
+            # t = Thread.new { server.start }
+            # trap("INT") { server.shutdown }
+            # t.join
           end
         end
 
@@ -312,25 +528,25 @@ module Jekyll
           opts[:SSLEnable] = true
         end
 
-        private
-        def start_callback(detached)
-          unless detached
-            proc do
-              @running << "."
-              Jekyll.logger.info "Server running...", "press ctrl-c to stop."
-            end
-          end
-        end
+        # private
+        # def start_callback(detached)
+        #   unless detached
+        #     proc do
+        #       @running << "."
+        #       Jekyll.logger.info "Server running...", "press ctrl-c to stop."
+        #     end
+        #   end
+        # end
 
-        private
-        def stop_callback(detached)
-          unless detached
-            proc do
-              @reload_reactor.stop unless @reload_reactor.nil?
-              @running.clear
-            end
-          end
-        end
+        # private
+        # def stop_callback(detached)
+        #   unless detached
+        #     proc do
+        #       @reload_reactor.stop unless @reload_reactor.nil?
+        #       @running.clear
+        #     end
+        #   end
+        # end
 
         private
         def mime_types

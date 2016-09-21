@@ -63,7 +63,7 @@ module Jekyll
             begin
               @body.each { |line| @new_body << line.to_s }
             ensure
-              @body.close
+              @body.close if @body.respond_to?(:close)
             end
           else
             @new_body = @body.lines
@@ -84,7 +84,7 @@ module Jekyll
             @content_length += line.bytesize
             @processed = true
           end
-          @new_body = @new_body.join
+          @new_body
         end
 
         def host_to_use
@@ -125,15 +125,15 @@ module Jekyll
         end
       end
 
-      class Servlet < WEBrick::HTTPServlet::FileHandler
+      class Servlet < Rack::Static
         DEFAULTS = {
           "Cache-Control" => "private, max-age=0, proxy-revalidate, " \
             "no-store, no-cache, must-revalidate"
         }.freeze
 
-        def initialize(server, root, callbacks)
+        def initialize(app, options={})
           # So we can access them easily.
-          @jekyll_opts = server.config[:JekyllOptions]
+          @jekyll_opts = options[:JekyllOptions]
           set_defaults
           super
         end
@@ -148,37 +148,41 @@ module Jekyll
         end
 
         # rubocop:disable Style/MethodName
-        def do_GET(req, res)
-          rtn = super
+        def call(env)
+          req = Rack::Request.new(env)
+
+          status, headers, body = super
+          res = Rack::Response.new(body, status, headers)
 
           if @jekyll_opts["livereload"]
-            return rtn if SkipAnalyzer.skip_processing?(req, res, @jekyll_opts)
+            return res.finish if SkipAnalyzer.skip_processing?(req, res, @jekyll_opts)
 
             processor = BodyProcessor.new(res.body, @jekyll_opts)
             processor.process!
             res.body = processor.new_body
-            res.content_length = processor.content_length.to_s
+            res.length = processor.content_length.to_s
 
             if processor.livereload_added
               # Add a header to indicate that the page content has been modified
-              res["X-Rack-LiveReload"] = "1"
+              res.header["X-Rack-LiveReload"] = "1"
             end
           end
 
           validate_and_ensure_charset(req, res)
           res.header.merge!(@headers)
-          rtn
+          res.finish
         end
 
         #
 
         private
         def validate_and_ensure_charset(_req, res)
-          key = res.header.keys.grep(%r!content-type!i).first
-          typ = res.header[key]
+          if res.include?('content-type')
+            typ = res.header['content-type']
 
-          unless typ =~ %r!;\s*charset=!
-            res.header[key] = "#{typ}; charset=#{@jekyll_opts["encoding"]}"
+            unless typ =~ %r!;\s*charset=!
+              res.header['content-type'] = "#{typ}; charset=#{@jekyll_opts["encoding"]}"
+            end
           end
         end
 
