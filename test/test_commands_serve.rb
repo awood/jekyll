@@ -18,7 +18,11 @@ class TestCommandsServe < JekyllUnitTest
       Jekyll::Commands::Serve.start(opts)
     end
 
-    sleep(0.1) until Jekyll::Commands::Serve.running?
+    Jekyll::Commands::Serve.mutex.synchronize do
+      unless Jekyll::Commands::Serve.running?
+        Jekyll::Commands::Serve.run_cond.wait(Jekyll::Commands::Serve.mutex)
+      end
+    end
   end
 
   def serve(opts)
@@ -72,7 +76,12 @@ class TestCommandsServe < JekyllUnitTest
       capture_io do
         Jekyll::Commands::Serve.shutdown
       end
-      sleep(0.1) while Jekyll::Commands::Serve.running?
+
+      Jekyll::Commands::Serve.mutex.synchronize do
+        if Jekyll::Commands::Serve.running?
+          Jekyll::Commands::Serve.run_cond.wait(Jekyll::Commands::Serve.mutex)
+        end
+      end
 
       FileUtils.remove_entry_secure(@temp_dir, true)
     end

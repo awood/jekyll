@@ -3,6 +3,12 @@ require "thread"
 module Jekyll
   module Commands
     class Serve < Command
+      # Based on pattern described in
+      # https://emptysqua.re/blog/an-event-synchronization-primitive-for-ruby/
+      @mutex = Mutex.new
+      @run_cond = ConditionVariable.new
+      @running = false
+
       class << self
         COMMAND_OPTIONS = {
           "ssl_cert"             => ["--ssl-cert [CERT]", "X.509 (SSL) certificate."],
@@ -33,7 +39,12 @@ module Jekyll
         LIVERELOAD_PORT = 35_729
         LIVERELOAD_DIR = File.join(File.dirname(__FILE__), "serve", "livereload_assets")
 
+        attr_reader :mutex, :run_cond
         #
+
+        def running?
+          @running
+        end
 
         def init_with_program(prog)
           prog.command(:serve) do |cmd|
@@ -75,6 +86,7 @@ module Jekyll
           # a reactor created by a previous test when our test might not
           # need/want a reactor at all.
           @reload_reactor = nil
+
           register_reload_hooks(opts) if opts["livereload"]
           Build.process(opts)
           opts["config"] = config
@@ -89,9 +101,6 @@ module Jekyll
           destination = opts["destination"]
           setup(destination)
 
-          # Need some way of communicating between the stop and start callbacks
-          @running = Queue.new
-
           if opts["livereload"]
             @reload_reactor.start(opts)
           end
@@ -104,16 +113,8 @@ module Jekyll
           boot_or_detach @server, opts
         end
 
-        #
-
-        def running?
-          !(@running.nil? || @running.empty?)
-        end
-
-        #
-
         def shutdown
-          @server.shutdown if running?
+          @server.shutdown if @running
         end
 
         private
@@ -319,8 +320,11 @@ module Jekyll
         def start_callback(detached)
           unless detached
             proc do
-              @running << "."
-              Jekyll.logger.info "Server running...", "press ctrl-c to stop."
+              mutex.synchronize do
+                @running = true
+                Jekyll.logger.info "Server running...", "press ctrl-c to stop."
+                @run_cond.broadcast
+              end
             end
           end
         end
@@ -329,8 +333,11 @@ module Jekyll
         def stop_callback(detached)
           unless detached
             proc do
-              @reload_reactor.stop unless @reload_reactor.nil?
-              @running.clear
+              mutex.synchronize do
+                @reload_reactor.stop unless @reload_reactor.nil?
+                @running = false
+                @run_cond.broadcast
+              end
             end
           end
         end
