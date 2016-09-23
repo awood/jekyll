@@ -68,6 +68,12 @@ module Jekyll
 
         def start(opts)
           config = opts["config"]
+
+          # Set the reactor to nil so any old reactor will be GCed.
+          # We can't unregister a hook so in testing when Serve.start is
+          # called multiple times we don't want to inadvertently keep using
+          # a reactor created by a previous test when our test might not
+          # need/want a reactor at all.
           @reload_reactor = nil
           register_reload_hooks(opts) if opts["livereload"]
           Build.process(opts)
@@ -151,7 +157,7 @@ module Jekyll
           # path matching is very loose so that a message to reload "/" will always
           # lead the page to reload since every page starts with "/".
           Jekyll::Hooks.register(:site, :post_write) do
-            unless @changed_pages.nil? || !@reload_reactor.running?
+            if @changed_pages && @reload_reactor && @reload_reactor.running?
               ignore, @changed_pages = @changed_pages.partition do |p|
                 Array(opts["livereload_ignore"]).any? do |filter|
                   File.fnmatch(filter, Jekyll.sanitized_path(p.relative_path))
