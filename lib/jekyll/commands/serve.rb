@@ -321,6 +321,14 @@ module Jekyll
           unless detached
             proc do
               mutex.synchronize do
+                # Block until EventMachine reactor starts
+                unless @reload_reactor.nil?
+                  @reload_reactor.reactor_mutex.synchronize do
+                    unless @reload_reactor.running?
+                      @reload_reactor.reactor_run_cond.wait(@reload_reactor.reactor_mutex)
+                    end
+                  end
+                end
                 @running = true
                 Jekyll.logger.info "Server running...", "press ctrl-c to stop."
                 @run_cond.broadcast
@@ -334,7 +342,15 @@ module Jekyll
           unless detached
             proc do
               mutex.synchronize do
-                @reload_reactor.stop unless @reload_reactor.nil?
+                unless @reload_reactor.nil?
+                  @reload_reactor.stop
+                  # Block until EventMachine reactor stops
+                  @reload_reactor.reactor_mutex.synchronize do
+                    if @reload_reactor.running?
+                      @reload_reactor.reactor_run_cond.wait(@reload_reactor.reactor_mutex)
+                    end
+                  end
+                end
                 @running = false
                 @run_cond.broadcast
               end

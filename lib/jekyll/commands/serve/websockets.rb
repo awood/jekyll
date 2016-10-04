@@ -75,11 +75,15 @@ module Jekyll
 
       class LiveReloadReactor
         attr_reader :thread
+        attr_reader :reactor_mutex
+        attr_reader :reactor_run_cond
 
         def initialize
           @thread = nil
           @websockets = []
           @connections_count = 0
+          @reactor_mutex = Mutex.new
+          @reactor_run_cond = ConditionVariable.new
         end
 
         def stop
@@ -90,7 +94,25 @@ module Jekyll
         end
 
         def running?
-          !@thread.nil? && @thread.alive?
+          EM.reactor_running?
+        end
+
+        def handle_websockets_event(ws)
+          ws.onopen do |handshake|
+            connect(ws, handshake)
+          end
+
+          ws.onclose do
+            disconnect(ws)
+          end
+
+          ws.onmessage do |msg|
+            print_message(msg)
+          end
+
+          ws.onerror do |error|
+            log_error(error)
+          end
         end
 
         def start(opts)
@@ -108,23 +130,22 @@ module Jekyll
                 HttpAwareConnection,
                 opts
               ) do |ws|
+                handle_websockets_event(ws)
+              end
 
-                ws.onopen do |handshake|
-                  connect(ws, handshake)
-                end
-
-                ws.onclose do
-                  disconnect(ws)
-                end
-
-                ws.onmessage do |msg|
-                  print_message(msg)
-                end
-
-                ws.onerror do |error|
-                  log_error(error)
+              # Notify blocked threads that EventMachine has started or shutdown
+              EM.schedule do
+                @reactor_mutex.synchronize do
+                  @reactor_run_cond.broadcast
                 end
               end
+
+              EM.add_shutdown_hook do
+                @reactor_mutex.synchronize do
+                  @reactor_run_cond.broadcast
+                end
+              end
+
               Jekyll.logger.info(
                 "LiveReload address:", "#{opts["host"]}:#{opts["livereload_port"]}"
               )
