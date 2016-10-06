@@ -17,6 +17,7 @@ class TestCommandsServe < JekyllUnitTest
     @thread = Thread.new do
       Jekyll::Commands::Serve.start(opts)
     end
+    @thread.abort_on_exception = true
 
     Jekyll::Commands::Serve.mutex.synchronize do
       unless Jekyll::Commands::Serve.running?
