@@ -67,6 +67,7 @@ module Jekyll
 
               # watch can legitimately be `false` so don't switch to ||=
               opts["watch"] = true unless opts.key?("watch")
+              opts["url"] = default_url(opts) if Jekyll.env == "development"
               opts["livereload_port"] = LIVERELOAD_PORT \
                 unless opts.key?("livereload_port")
 
@@ -101,16 +102,7 @@ module Jekyll
           destination = opts["destination"]
           setup(destination)
 
-          if opts["livereload"]
-            @reload_reactor.start(opts)
-          end
-
-          @server = WEBrick::HTTPServer.new(webrick_opts(opts)).tap { |o| o.unmount("") }
-          @server.mount(opts["baseurl"], Servlet, destination, file_handler_opts)
-
-          Jekyll.logger.info "Server address:", server_address(@server, opts)
-          launch_browser @server, opts if opts["open_url"]
-          boot_or_detach @server, opts
+          start_up_webrick(opts, destination)
         end
 
         def shutdown
@@ -220,6 +212,27 @@ module Jekyll
           opts
         end
 
+        #
+
+        private
+        def start_up_webrick(opts, destination)
+          if opts["livereload"]
+            @reload_reactor.start(opts)
+          end
+
+          @server = WEBrick::HTTPServer.new(webrick_opts(opts)).tap { |o| o.unmount("") }
+          @server.mount(opts["baseurl"], Servlet, destination, file_handler_opts)
+
+          Jekyll.logger.info "Server address:", server_address(
+            @server.config[:SSLEnable],
+            @server.config[:BindAddress],
+            @server.config[:Port],
+            opts["baseurl"]
+          )
+          launch_browser @server, opts if opts["open_url"]
+          boot_or_detach @server, opts
+        end
+
         # Recreate NondisclosureName under utf-8 circumstance
 
         private
@@ -235,13 +248,25 @@ module Jekyll
         #
 
         private
-        def server_address(server, opts)
+        def server_address(prefix, address, port, baseurl = nil)
           format("%{prefix}://%{address}:%{port}%{baseurl}", {
-            :prefix  => server.config[:SSLEnable] ? "https" : "http",
-            :baseurl => opts["baseurl"] ? "#{opts["baseurl"]}/" : "",
-            :address => server.config[:BindAddress],
-            :port    => server.config[:Port]
+            :prefix  => prefix ? "https" : "http",
+            :address => address,
+            :port    => port,
+            :baseurl => baseurl ? "#{baseurl}/" : ""
           })
+        end
+
+        #
+
+        private
+        def default_url(opts)
+          config = configuration_from_options(opts)
+          server_address(
+            config["ssl_cert"] && config["ssl_key"],
+            config["host"] == "127.0.0.1" ? "localhost" : config["host"],
+            config["port"]
+          )
         end
 
         #
