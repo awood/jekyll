@@ -1,4 +1,4 @@
-## HEAD
+## 3.3.0 / 2016-10-06
 
 ### Minor Enhancements
 
@@ -17,6 +17,7 @@
   * Run hooks in priority order. (#5157)
   * Add `static_file.name` and `.basename` Liquid attributes (#5264)
   * set site.url in dev environment to `http://localhost:4000` (#5431)
+  * Add support for indented link references on excerpt (#5212)
 
 ### Bug Fixes
 
@@ -31,6 +32,10 @@
   * Don't call `File.utime` for StaticFiles if it's a symlink (#5427)
   * Fix handling of non-ASCII characters in new `*_url` filters (#5410)
   * Remove autoload of Draft which no longer exists. (#5441)
+  * Fix issue where Windows drive name is stripped from Jekyll.sanitized_path incorrectly (#5256)
+  * Fix bug where `post_url` tag matched incorrect post with subdirectory (#4873)
+  * Fix loading data from subdir with a period in name (#5433)
+  * Revert Commands::Serve#server_address signature change. (#5456)
 
 ### Site Enhancements
 
@@ -73,6 +78,8 @@
   * Fix Travis.ci documentation (#5413)
   * [docs] Update documentation regarding `bundle install` after `jekyll new` (#5428)
   * Replace classic box-sizing reset with inheritance reset (#5411)
+  * Update Wikipedia YAML list link (#5452)
+  * Add Jekyll 3.3 release post (#5442)
 
 ### Development Fixes
 
