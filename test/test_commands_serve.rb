@@ -15,7 +15,12 @@ class TestCommandsServe < JekyllUnitTest
 
   def start_server(opts)
     @thread = Thread.new do
-      Jekyll::Commands::Serve.start(opts)
+      merc = nil
+      cmd = Jekyll::Commands::Serve
+      Mercenary.program(:jekyll) do |p|
+        merc = cmd.init_with_program(p)
+      end
+      merc.execute(:serve, opts)
     end
     @thread.abort_on_exception = true
 
