@@ -60,14 +60,14 @@ module Jekyll
 
             cmd.action do |_, opts|
               opts["serving"] = true
-
-              # Check to make sure the specified options make sense logically
-              # before setting defaults.
-              validate_options(opts)
-
-              # watch can legitimately be `false` so don't switch to ||=
               opts["watch"] = true unless opts.key?("watch")
               opts["url"] = default_url(opts) if Jekyll.env == "development"
+
+              # Check to make sure that specified options make sense logically
+              validate_options(opts)
+
+              # Set this default late because we want to validate that users do have
+              # --livereload-port set but --livereload disabled.
               opts["livereload_port"] = LIVERELOAD_PORT \
                 unless opts.key?("livereload_port")
 
@@ -110,7 +110,6 @@ module Jekyll
         end
 
         private
-        # rubocop:disable Metrics/PerceivedComplexity
         def validate_options(opts)
           if opts["livereload"]
             if opts["detach"]
@@ -128,13 +127,13 @@ module Jekyll
               Jekyll.logger.warn "Using --livereload without --watch defeats the purpose"\
                 " of LiveReload."
             end
-          elsif opts["livereload_min_delay"] ||
-              opts["livereload_max_delay"]   ||
-              opts["livereload_ignore"]      ||
-              opts["livereload_port"]
-            Jekyll.logger.warn "The --livereload-min-delay, --livereload-max-delay, "\
-               "--livereload-ignore, and --livereload-port options require the "\
-               "--livereload option."
+          elsif %w(livereload_min_delay
+              livereload_max_delay
+              livereload_ignore
+              livereload_port).any? { |o| opts[o] }
+            Jekyll.logger.abort_with "--livereload-min-delay, "\
+               "--livereload-max-delay, --livereload-ignore, and "\
+               "--livereload-port require the --livereload option."
           end
         end
 
