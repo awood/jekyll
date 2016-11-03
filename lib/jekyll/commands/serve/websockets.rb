@@ -138,15 +138,11 @@ module Jekyll
 
               # Notify blocked threads that EventMachine has started or shutdown
               EM.schedule do
-                @reactor_mutex.synchronize do
-                  @reactor_run_cond.broadcast
-                end
+                @reactor_mutex.synchronize { @reactor_run_cond.broadcast }
               end
 
               EM.add_shutdown_hook do
-                @reactor_mutex.synchronize do
-                  @reactor_run_cond.broadcast
-                end
+                @reactor_mutex.synchronize { @reactor_run_cond.broadcast }
               end
 
               Jekyll.logger.info(
