@@ -117,6 +117,13 @@ module Jekyll
               Jekyll.logger.abort_with "Error:",
                 "--detach and --livereload are mutually exclusive"
             end
+            if opts["ssl_cert"] || opts["ssl_key"]
+              # This is not technically true.  LiveReload works fine over SSL, but
+              # EventMachine's SSL support in Windows requires building the gem's
+              # native extensions against OpenSSL and that proved to be a process
+              # so tedious that expecting users to do it is a non-starter.
+              Jekyll.logger.abort_with "Error:", "LiveReload does not support SSL"
+            end
             unless opts["watch"]
               Jekyll.logger.warn "Using --livereload without --watch defeats the purpose"\
                 " of LiveReload."
@@ -329,12 +336,6 @@ module Jekyll
           end
           require "openssl"
           require "webrick/https"
-
-          Jekyll.logger.info "LiveReload:", "Serving over SSL/TLS.  If you are using a "\
-            "certificate signed by an unknown CA, you will need to add an exception "\
-            "for #{opts[:JekyllOptions]["host"]} on ports "\
-            "#{opts[:JekyllOptions]["port"]} and "\
-            "#{opts[:JekyllOptions]["livereload_port"]}"
 
           source_key = Jekyll.sanitized_path(opts[:JekyllOptions]["source"], \
                     opts[:JekyllOptions]["ssl_key" ])

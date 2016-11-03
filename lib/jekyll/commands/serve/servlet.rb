@@ -101,13 +101,10 @@ module Jekyll
         end
 
         def livereload_source
-          use_ssl = @options["ssl_cert"] && @options["ssl_key"]
-          protocol = use_ssl ? "https" : "http"
-
           # Unclear what "snipver" does. Doc at
           # https://github.com/livereload/livereload-js state that the recommended
           # setting is 1.
-          src = "#{protocol}://#{host_to_use}:#{@options["livereload_port"]}"\
+          src = "http://#{host_to_use}:#{@options["livereload_port"]}"\
             "/livereload.js?snipver=1"
 
           # XHTML standard requires ampersands to be encoded as entities when in

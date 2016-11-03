@@ -11,22 +11,25 @@ module Jekyll
       class HttpAwareConnection < EventMachine::WebSocket::Connection
         attr_reader :reload_body, :reload_size
 
-        def initialize(opts)
-          em_opts = {}
-          @ssl_enabled = opts["ssl_cert"] && opts["ssl_key"]
-          if @ssl_enabled
-            em_opts[:tls_options] = {
-              :private_key_file => Jekyll.sanitized_path(opts["source"], opts["ssl_key"]),
-              :cert_chain_file  => Jekyll.sanitized_path(opts["source"], opts["ssl_cert"])
-            }
-            em_opts[:secure] = true
-          end
+        def initialize(_opts)
+          # If EventMachine SSL support on Windows ever gets better, the code below will
+          # set up the reactor to handle SSL
+          #
+          # @ssl_enabled = opts["ssl_cert"] && opts["ssl_key"]
+          # if @ssl_enabled
+          #   em_opts[:tls_options] = {
+          #   :private_key_file => Jekyll.sanitized_path(opts["source"], opts["ssl_key"]),
+          #   :cert_chain_file  => Jekyll.sanitized_path(opts["source"], opts["ssl_cert"])
+          #   }
+          #   em_opts[:secure] = true
+          # end
 
           # This is too noisy even for --verbose, but uncomment if you need it for
           # a specific WebSockets issue.  Adding ?LR-verbose=true onto the URL will
           # enable logging on the client side.
           # em_opts[:debug] = true
 
+          em_opts = {}
           super(em_opts)
 
           reload_file = File.join(Serve.singleton_class::LIVERELOAD_DIR, "livereload.js")

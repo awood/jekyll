@@ -100,48 +100,6 @@ class TestCommandsServe < JekyllUnitTest
       assert_match(%r!LiveReload.on!, content)
     end
 
-    should "serve livereload.js over HTTPS" do
-      skip("EventMachine TLS support is dodgy in JRuby") if jruby?
-      key = File.join(File.dirname(__FILE__), "fixtures", "test.key")
-      cert = File.join(File.dirname(__FILE__), "fixtures", "test.crt")
-
-      FileUtils.cp(key, @temp_dir)
-      FileUtils.cp(cert, @temp_dir)
-      opts = serve(@standard_options.merge(
-        "ssl_cert" => "test.crt",
-        "ssl_key"  => "test.key"
-      ))
-
-      @client.ssl_config.add_trust_ca(cert)
-      content = @client.get_content(
-        "https://#{opts["host"]}:#{opts["livereload_port"]}/livereload.js"
-      )
-      assert_match(%r!LiveReload.on!, content)
-    end
-
-    should "use wss when SSL options are provided" do
-      key = File.join(File.dirname(__FILE__), "fixtures", "test.key")
-      cert = File.join(File.dirname(__FILE__), "fixtures", "test.crt")
-
-      FileUtils.cp(key, @temp_dir)
-      FileUtils.cp(cert, @temp_dir)
-      opts = serve(@standard_options.merge(
-        "ssl_cert" => "test.crt",
-        "ssl_key"  => "test.key"
-      ))
-
-      @client.ssl_config.add_trust_ca(cert)
-      content = @client.get_content(
-        "https://#{opts["host"]}:#{opts["port"]}/#{opts["baseurl"]}/hello.html"
-      )
-      # The livereload JS determines whether to use wss or ws based on whether
-      # it is loaded over http or https.
-      assert_match(
-        %r!src="https://#{opts["host"]}:#{opts["livereload_port"]}/livereload.js!,
-        content
-      )
-    end
-
     should "serve nothing else over HTTP on the default LiveReload port" do
       opts = serve(@standard_options)
       res = @client.get("http://#{opts["host"]}:#{opts["livereload_port"]}/")
@@ -243,6 +201,22 @@ class TestCommandsServe < JekyllUnitTest
       should "use empty directory index list when show_dir_listing is true" do
         opts = { "show_dir_listing" => true }
         assert custom_opts(opts)[:DirectoryIndex].empty?
+      end
+
+      should "abort if both livereload and ssl_cert are given" do
+        custom_options = {
+          "config"          => %w(_config.yml _development.yml),
+          "serving"         => true,
+          "livereload_port" => Jekyll::Commands::Serve.singleton_class::LIVERELOAD_PORT,
+          "url"             => "http://localhost:4000",
+          "livereload"      => true,
+          "ssl_cert"        => "/does/not/exist",
+          "ssl_key"         => "/does/not/exist"
+        }
+
+        assert_raises SystemExit do
+          @merc.execute(:serve, custom_options)
+        end
       end
 
       should "keep config between build and serve" do
