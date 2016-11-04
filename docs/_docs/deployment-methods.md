@@ -10,11 +10,6 @@ Sites built using Jekyll can be deployed in a large number of ways due to the st
 
 Just about any traditional web hosting provider will let you upload files to their servers over FTP. To upload a Jekyll site to a web host using FTP, simply run the `jekyll build` command and copy the generated `_site` folder to the root folder of your hosting account. This is most likely to be the `httpdocs` or `public_html` folder on most hosting providers.
 
-### FTP using Glynn
-
-There is a project called [Glynn](https://github.com/dmathieu/glynn), which lets you easily generate your Jekyll powered website’s static files and
-send them to your host through FTP.
-
 ## Self-managed web server
 
 If you have direct access to the deployment web server, the process is essentially the same, except you might have other methods available to you (such as `scp`, or even direct filesystem access) for transferring the files. Just remember to make sure the contents of the generated `_site` folder get placed in the appropriate web root directory for your web server.
@@ -72,19 +67,6 @@ Deploying is now as easy as telling nginx or Apache to look at
 laptops$ git push deploy master
 ```
 
-### Jekyll-hook
-
-You can also use jekyll-hook, a server that listens for webhook posts from
-GitHub, generates a website with Jekyll, and moves it somewhere to be
-published. Use this to run your own GitHub Pages-style web server.
-
-This method is useful if you need to serve your websites behind a firewall,
-need extra server-level features like HTTP basic authentication or want to
-host your site directly on a CDN or file host like S3.
-
-Setup steps are fully documented
-[in the `jekyll-hook` repo](https://github.com/developmentseed/jekyll-hook).
-
 ### Static Publisher
 
 [Static Publisher](https://github.com/static-publisher/static-publisher) is another automated deployment option with a server listening for webhook posts, though it's not tied to GitHub specifically. It has a one-click deploy to Heroku, it can watch multiple projects from one server, it has an easy to user admin interface and can publish to either S3 or to a git repository (e.g. gh-pages).
@@ -102,7 +84,7 @@ Once you’ve generated the `_site` directory, you can easily scp it using a
 need to change the values to reflect your site’s details. There is even [a
 matching TextMate command][] that will help you run this script.
 
-[this deploy script here]: https://github.com/henrik/henrik.nyh.se/blob/master/script/deploy
+[this deploy script]: https://github.com/henrik/henrik.nyh.se/blob/master/script/deploy
 
 [a matching TextMate command]: https://gist.github.com/henrik/214959
 

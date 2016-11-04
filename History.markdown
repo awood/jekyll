@@ -1,3 +1,44 @@
+## HEAD
+
+  * Add permalinks to docs in '/maintaining/' (#5532)
+
+### Site Enhancements
+
+  * Documentation: {% link %} tag  (#5449)
+  * Updating install instruction link for Jekyll 3 on Windows (#5475)
+  * Update normalize.css to v5.0.0 (#5471)
+  * Add jekyll-data to the list of plugins (#5491)
+  * Add info about checking version + updating (#5497)
+  * Add jekyll-include-absolute-plugin to list of third-party plugins (#5492)
+  * Remove jekyll-hook from deployment methods (#5502)
+  * Update deployment-methods.md (#5504)
+  * Ubuntu users should install ruby2.3-dev (#5512)
+  * Remove Glynn as deployment option (#5519)
+  * Fix broken forum link (#5466)
+  * Move documentation to docs folder (#5459)
+  * Fix broken links in CONTRIBUTING (#5533)
+  * Update documentation on jekyllrb.com (#5540)
+  * Fix HTML rendering (#5536)
+
+### Bug Fixes
+
+  * Fix typo in theme_template README (#5472)
+  * Do not swallow all exceptions on render (#5495)
+  * Site template: fixed `_config.yml` comment typo (#5511)
+  * `jekyll new-theme` should specify Jekyll as a runtime dependency for the theme (#5457)
+
+### Development Fixes
+
+  * fix rubocop errors on testing with Rubocop 0.44 (#5489)
+  * script/test: add missing whitespace (#5479)
+  * Restrict Rubocop version (#5496)
+  * include a hashbang for all benchmark scripts & make them executable (#5505)
+  * Update source in script/proof (#5538)
+
+### Minor Enhancements
+
+  * Collapse `gsub` (#5494)
+
 ## 3.3.0 / 2016-10-06
 
 ### Minor Enhancements

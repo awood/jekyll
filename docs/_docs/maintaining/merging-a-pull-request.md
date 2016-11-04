@@ -1,12 +1,17 @@
-# Maintainers: Merging a Pull Request
+---
+title: "Merging a Pull Request"
+layout: docs
+permalink: /docs/maintaining/merging-a-pull-request/
+---
 
 **This guide is for maintainers.** These special people have **write access** to one or more of Jekyll's repositories and help merge the contributions of others. You may find what is written here interesting, but it’s definitely not for everyone.
+{: .note .info }
 
 ## Code Review
 
 All pull requests should be subject to code review. Code review is a [foundational value](https://blog.fullstory.com/what-we-learned-from-google-code-reviews-arent-just-for-catching-bugs-b125a13aa292) of good engineering teams. Besides providing validation of correctness, it promotes a sense of community and gives other maintainers understanding of all parts of the code base. In short, code review is crucial to a healthy open source project.
 
-**Read our guide for [Reviewing a pull request](reviewing-a-pull-request.md) before merging.** Notably, the change must have tests if for code, and at least two maintainers must give it an OK.
+**Read our guide for [Reviewing a pull request](../reviewing-a-pull-request) before merging.** Notably, the change must have tests if for code, and at least two maintainers must give it an OK.
 
 ## Merging
 

@@ -1,6 +1,11 @@
-# Maintainers: Avoiding Burnout
+---
+title: "Avoiding Burnout"
+layout: docs
+permalink: /docs/maintaining/avoiding-burnout/
+---
 
 **This guide is for maintainers.** These special people have **write access** to one or more of Jekyll's repositories and help merge the contributions of others. You may find what is written here interesting, but it’s definitely not for everyone.
+{: .note .info }
 
 # 1. Use Jekyll
 
@@ -24,4 +29,4 @@ Jekyll gets a lot of feature requests, non-reproducible bug reports, usage quest
 
 Thanks to https://gist.github.com/ryanflorence/124070e7c4b3839d4573 which influenced this document.
 
-Thanks to [Homebrew's "Avoiding Burnout" document](https://github.com/Homebrew/brew/blob/master/share/doc/homebrew/Maintainers-Avoiding-Burnout.md) for providing a perfect base for this document.
+Thanks to [Homebrew's "Avoiding Burnout" document](https://github.com/Homebrew/brew/blob/master/docs/Maintainers-Avoiding-Burnout.md) for providing a perfect base for this document.

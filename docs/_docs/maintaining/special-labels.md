@@ -1,6 +1,11 @@
-# Maintainers: Special Labels
+---
+title: "Special Labels"
+layout: docs
+permalink: /docs/maintaining/special-labels/
+---
 
 **This guide is for maintainers.** These special people have **write access** to one or more of Jekyll's repositories and help merge the contributions of others. You may find what is written here interesting, but it’s definitely not for everyone.
+{: .note .info }
 
 We use a series of "special labels" on GitHub.com to automate handling of some parts of the pull request and issue process. @jekyllbot may automatically apply or remove certain labels based on actions taken by users or maintainers. Below are the labels and how they work:
 
@@ -14,4 +19,4 @@ These labels are used to indicate that the Git state of a pull request must chan
 
 ## `stale`
 
-This label is automatically added and removed by @jekyllbot based on activity on an issue or pull request. The rules for this label are laid out in [Triaging an Issue: Staleness and automatic closure](triaging-an-issue.md#staleness-and-automatic-closure).
+This label is automatically added and removed by @jekyllbot based on activity on an issue or pull request. The rules for this label are laid out in [Triaging an Issue: Staleness and automatic closure](../triaging-an-issue/#staleness-and-automatic-closure).

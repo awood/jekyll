@@ -1,10 +1,15 @@
-# Maintainers: Reviewing a Pull Request
+---
+title: "Reviewing a Pull Request"
+layout: docs
+permalink: /docs/maintaining/reviewing-a-pull-request/
+---
 
 **This guide is for maintainers.** These special people have **write access** to one or more of Jekyll's repositories and help merge the contributions of others. You may find what is written here interesting, but it’s definitely not for everyone.
+{: .note .info }
 
 ## Respond Kindly
 
-Above all else, please review a pull request kindly. Our community can only be strong if we make it a welcoming and inclusive environment. To further promote this, the Jekyll community is governed by a [Code of Conduct](../CONDUCT.markdown) by which all community members must abide.
+Above all else, please review a pull request kindly. Our community can only be strong if we make it a welcoming and inclusive environment. To further promote this, the Jekyll community is governed by a [Code of Conduct](/docs/conduct/) by which all community members must abide.
 
 Use emoji liberally :heart: :tada: :sparkles: :confetti_ball: and feel free to be emotive!! Contributions keep this project moving forward and we're always happy to receive them, even if the pull request isn't ultimately merged.
 
@@ -41,4 +46,3 @@ A pull request may be merged once two maintainers have reviewed the pull request
 ## Think Security
 
 We owe it to our users to ensure that using a theme from the community or building someone else's site doesn't come with built-in security vulnerabilities. Things like where files may be read from and written to are important to keep secure. Jekyll is also the basis for hosted services such as [GitHub Pages](https://pages.github.com), which cannot upgrade when security issues are introduced.
-
