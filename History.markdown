@@ -1,7 +1,5 @@
 ## HEAD
 
-  * Add permalinks to docs in '/maintaining/' (#5532)
-
 ### Site Enhancements
 
   * Documentation: {% link %} tag  (#5449)
@@ -19,6 +17,15 @@
   * Fix broken links in CONTRIBUTING (#5533)
   * Update documentation on jekyllrb.com (#5540)
   * Fix HTML rendering (#5536)
+  * Remove outdated deployment information (#5557)
+  * no more invalid US-ASCII on lines 30 and 97 (#5520)
+  * Add permalinks to docs in '/maintaining/' (#5532)
+  * Add jekyll-pinboard to list of third-party plugins (#5514)
+  * Fix formatting in 2-to-3.md (#5507)
+  * Add two plugins to the plugins page (#5493)
+  * Use site.baseurl before link and post_url tags (#5559)
+  * Fix link to jekyll-pinboard plugin (#5570)
+  * mention `docs` folder as a way to deploy on GitHub Pages (#5571)
 
 ### Bug Fixes
 
@@ -26,6 +33,8 @@
   * Do not swallow all exceptions on render (#5495)
   * Site template: fixed `_config.yml` comment typo (#5511)
   * `jekyll new-theme` should specify Jekyll as a runtime dependency for the theme (#5457)
+  * Be much more specific about ignoring specific vendored directories. (#5564)
+  * Only warn about auto-regeneration bug on Bash On Windows. (#5464)
 
 ### Development Fixes
 
@@ -34,10 +43,13 @@
   * Restrict Rubocop version (#5496)
   * include a hashbang for all benchmark scripts & make them executable (#5505)
   * Update source in script/proof (#5538)
+  * Collections.feature: conditional steps to have it pass on Windows (#5546)
+  * Fix tests to get script/test to pass on Windows (#5526)
 
 ### Minor Enhancements
 
   * Collapse `gsub` (#5494)
+  * URL: warn if key doesn't exist in url drop (#5524)
 
 ## 3.3.0 / 2016-10-06
 
