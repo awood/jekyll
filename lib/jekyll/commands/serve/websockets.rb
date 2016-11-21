@@ -77,16 +77,16 @@ module Jekyll
       end
 
       class LiveReloadReactor
+        attr_reader :started_event
+        attr_reader :stopped_event
         attr_reader :thread
-        attr_reader :reactor_mutex
-        attr_reader :reactor_run_cond
 
         def initialize
           @thread = nil
           @websockets = []
           @connections_count = 0
-          @reactor_mutex = Mutex.new
-          @reactor_run_cond = ConditionVariable.new
+          @started_event = Utils::ThreadEvent.new
+          @stopped_event = Utils::ThreadEvent.new
         end
 
         def stop
@@ -138,11 +138,11 @@ module Jekyll
 
               # Notify blocked threads that EventMachine has started or shutdown
               EM.schedule do
-                @reactor_mutex.synchronize { @reactor_run_cond.broadcast }
+                @started_event.set
               end
 
               EM.add_shutdown_hook do
-                @reactor_mutex.synchronize { @reactor_run_cond.broadcast }
+                @stopped_event.set
               end
 
               Jekyll.logger.info(

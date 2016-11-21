@@ -3,8 +3,10 @@ require "thread"
 module Jekyll
   module Commands
     class Serve < Command
-      # Based on pattern described in
-      # https://emptysqua.re/blog/an-event-synchronization-primitive-for-ruby/
+      # Similar to the pattern in Utils::ThreadEvent except we are maintaining the
+      # state of @running instead of just signaling and event.  We have to maintain this
+      # state since Serve is just called via class methods instead of an instance
+      # being created each time.
       @mutex = Mutex.new
       @run_cond = ConditionVariable.new
       @running = false
@@ -352,13 +354,7 @@ module Jekyll
             proc do
               mutex.synchronize do
                 # Block until EventMachine reactor starts
-                unless @reload_reactor.nil?
-                  @reload_reactor.reactor_mutex.synchronize do
-                    unless @reload_reactor.running?
-                      @reload_reactor.reactor_run_cond.wait(@reload_reactor.reactor_mutex)
-                    end
-                  end
-                end
+                @reload_reactor.started_event.wait unless @reload_reactor.nil?
                 @running = true
                 Jekyll.logger.info "Server running...", "press ctrl-c to stop."
                 @run_cond.broadcast
@@ -374,12 +370,7 @@ module Jekyll
               mutex.synchronize do
                 unless @reload_reactor.nil?
                   @reload_reactor.stop
-                  # Block until EventMachine reactor stops
-                  @reload_reactor.reactor_mutex.synchronize do
-                    if @reload_reactor.running?
-                      @reload_reactor.reactor_run_cond.wait(@reload_reactor.reactor_mutex)
-                    end
-                  end
+                  @reload_reactor.stopped_event.wait
                 end
                 @running = false
                 @run_cond.broadcast

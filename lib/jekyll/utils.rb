@@ -4,6 +4,7 @@ module Jekyll
     extend self
     autoload :Platforms, "jekyll/utils/platforms"
     autoload :Ansi, "jekyll/utils/ansi"
+    autoload :ThreadEvent, "jekyll/utils/thread_event"
 
     # Constants for use in #slugify
     SLUGIFY_MODES = %w(raw default pretty ascii).freeze
