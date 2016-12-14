@@ -149,6 +149,22 @@ common tasks easier.
     </tr>
     <tr>
       <td>
+        <p class="name"><strong>Group By Expression</strong></p>
+        <p>Group an array's items using a Liquid expression.</p>
+      </td>
+      <td class="align-center">
+        <p>
+         <code class="filter">{% raw %}{{ site.members | group_by_exp:"item",
+"item.graduation_year | truncate: 3, \"\"" }}{% endraw %}</code>
+        </p>
+        <p>
+          <code class="output">[{"name"=>"201...", "items"=>[...]},
+{"name"=>"200...", "items"=>[...]}]</code>
+        </p>
+      </td>
+    </tr>
+    <tr>
+      <td>
         <p class="name"><strong>XML Escape</strong></p>
         <p>Escape some text for use in XML.</p>
       </td>
@@ -208,7 +224,7 @@ common tasks easier.
     <tr>
       <td>
         <p class="name"><strong>Array to Sentence</strong></p>
-        <p>Convert an array into a sentence. Useful for listing tags.</p>
+        <p>Convert an array into a sentence. Useful for listing tags. Optional argument for connector.</p>
       </td>
       <td class="align-center">
         <p>
@@ -216,6 +232,12 @@ common tasks easier.
         </p>
         <p>
           <code class="output">foo, bar, and baz</code>
+        </p>
+        <p>
+         <code class="filter">{% raw %}{{ page.tags | array_to_sentence_string: 'or' }}{% endraw %}</code>
+        </p>
+        <p>
+          <code class="output">foo, bar, or baz</code>
         </p>
       </td>
     </tr>
