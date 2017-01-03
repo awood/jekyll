@@ -96,10 +96,11 @@ module Jekyll
           # https://github.com/livereload/livereload-js states that the recommended
           # setting is 1.
 
-          # Complicated JavaScript to ensure that livereload.js is loaded from the same origin as the
-          # page.  Mostly useful for dealing with the browser's distinction between 'localhost' and 127.0.0.1
+          # Complicated JavaScript to ensure that livereload.js is loaded from the
+          # same origin as the page.  Mostly useful for dealing with the browser's
+          # distinction between 'localhost' and 127.0.0.1
           template = <<-TEMPLATE
-          <script>            
+          <script>
             document.write(
               '<script src="http://' +
               (location.host || 'localhost').split(':')[0] +
@@ -114,7 +115,7 @@ module Jekyll
         def livereload_args
           # XHTML standard requires ampersands to be encoded as entities when in
           # attributes. See http://stackoverflow.com/a/2190292
-          src = ''
+          src = ""
           if @options["livereload_min_delay"]
             src << "&amp;mindelay=#{@options["livereload_min_delay"]}"
           end
