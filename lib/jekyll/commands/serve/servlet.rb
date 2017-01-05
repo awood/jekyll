@@ -87,10 +87,6 @@ module Jekyll
           @new_body = @new_body.join
         end
 
-        def host_to_use
-          (@options["host"] || "localhost").gsub(%r!:.*!, "")
-        end
-
         def template
           # Unclear what "snipver" does. Doc at
           # https://github.com/livereload/livereload-js states that the recommended
