@@ -55,7 +55,7 @@ class TestCommandsServe < JekyllUnitTest
         "livereload"      => true,
         "source"          => @temp_dir,
         "destination"     => @destination,
-        "livereload_port" => Jekyll::Commands::Serve.singleton_class::LIVERELOAD_PORT
+        "livereload_port" => Jekyll::Commands::Serve.singleton_class::LIVERELOAD_PORT,
       }
 
       site = instance_double(Jekyll::Site)
@@ -211,7 +211,7 @@ class TestCommandsServe < JekyllUnitTest
           "url"             => "http://localhost:4000",
           "livereload"      => true,
           "ssl_cert"        => "/does/not/exist",
-          "ssl_key"         => "/does/not/exist"
+          "ssl_key"         => "/does/not/exist",
         }
 
         assert_raises SystemExit do

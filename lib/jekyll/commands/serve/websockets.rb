@@ -52,7 +52,7 @@ module Jekyll
               "Content-Type: application/javascript",
               "Content-Length: #{reload_size}",
               "",
-              ""
+              "",
             ].join("\r\n")
             send_data(headers)
 
@@ -67,7 +67,7 @@ module Jekyll
               "Content-Type: text/plain",
               "Content-Length: #{body.bytesize}",
               "",
-              ""
+              "",
             ].join("\r\n")
             send_data(headers)
             send_data(body)
@@ -160,7 +160,7 @@ module Jekyll
             msg = {
               :command => "reload",
               :path    => p.url,
-              :liveCSS => true
+              :liveCSS => true,
             }
 
             Jekyll.logger.debug("LiveReload:", "Reloading #{p.url}")
